@@ -7,7 +7,7 @@ const starfestsFile = './StarFestInfo.json';
 
 app.use(express.json());
 
-app.get('node/api/starfests', (req, res) => {
+app.get('/node/api/starfests', (req, res) => {
   console.log("request received");
   // Read the starfests data from the file
   fs.readFile(starfestsFile, 'utf8', (err, data) => {
@@ -22,7 +22,7 @@ app.get('node/api/starfests', (req, res) => {
   });
 });
 
-app.put('node/starfests/increment-team1-count', (req, res) => {
+app.put('/node/starfests/increment-team1-count', (req, res) => {
   fs.readFile(starfestsFile, 'utf8', (err, data) => {
     if (err) {
       console.error(err);
@@ -63,7 +63,7 @@ app.put('node/starfests/increment-team1-count', (req, res) => {
   });
 });
 
-app.put('node/starfests/increment-team2-count', (req, res) => {
+app.put('/node/starfests/increment-team2-count', (req, res) => {
   fs.readFile(starfestsFile, 'utf8', (err, data) => {
     if (err) {
       console.error(err);
