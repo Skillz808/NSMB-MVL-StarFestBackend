@@ -1,0 +1,15 @@
+{
+    "starfests": [
+      {
+        "id": 1,
+        "startTime": "2023-04-02T23:00:00.000Z",
+        "endTime": "2023-04-04T23:00:00.000Z",
+        "team1Name": "Mario",
+        "team2Name": "Luigi",
+        "team1Count": 0,
+        "team2Count": 0,
+        "team1Points": 0,
+        "team2Points": 0
+      }
+    ]
+    }
