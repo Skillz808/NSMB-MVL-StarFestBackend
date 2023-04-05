@@ -2,12 +2,30 @@ const express = require('express');
 const app = express();
 const port = 3000;
 const fs = require('fs');
+const path = require('path');
+
+const configFilePath = path.join(__dirname, 'config.json');
+const config = JSON.parse(fs.readFileSync(configFilePath, 'utf8'));
+
+const apiKeys = config.apiKey;
 
 const starfestsFile = './StarFestInfo.json';
 
 app.use(express.json());
 
-app.get('/api/starfests', (req, res) => {
+const requireApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  console.log('API key:', apiKey); // Log the API key to the console
+
+  // Check if the API key matches the expected value
+  if (apiKey && apiKey === apiKeys) {
+    next(); // API key is valid, continue to the next middleware/route handler
+  } else {
+    res.status(401).send('Unauthorized'); // API key is invalid, send a 401 Unauthorized response
+  }
+};
+
+app.get('/api/starfests', requireApiKey, (req, res) => {
   console.log("request received");
   // Read the starfests data from the file
   fs.readFile(starfestsFile, 'utf8', (err, data) => {
@@ -22,7 +40,7 @@ app.get('/api/starfests', (req, res) => {
   });
 });
 
-app.put('/starfests/increment-team1-count', (req, res) => {
+app.put('/starfests/increment-team1-count', requireApiKey, (req, res) => {
   fs.readFile(starfestsFile, 'utf8', (err, data) => {
     if (err) {
       console.error(err);
@@ -63,7 +81,7 @@ app.put('/starfests/increment-team1-count', (req, res) => {
   });
 });
 
-app.put('/starfests/increment-team2-count', (req, res) => {
+app.put('/starfests/increment-team2-count', requireApiKey,(req, res) => {
   fs.readFile(starfestsFile, 'utf8', (err, data) => {
     if (err) {
       console.error(err);
