@@ -1,1 +1,30 @@
-{"starfests":[{"id":1,"startTime":"2023-04-04T22:52:00.000Z","endTime":"2023-04-04T22:52:30.000Z","team1Name":"Mario","team2Name":"Luigi","team1Color":"#c80000","team2Color":"#389820","team1Count":1,"team2Count":0,"team1Points":0,"team2Points":0},{"id":2,"startTime":"2023-04-04T23:52:00.000Z","endTime":"2023-04-05T22:53:10.000Z","team1Name":"Wario","team2Name":"Waluigi","team1Color":"#fdd50b","team2Color":"#540674","team1Count":3,"team2Count":6,"team1Points":0,"team2Points":0}]}
+{
+  "starfests": [
+    {
+      "id": 1,
+      "startTime": "2023-06-24T02:48:00.000Z",
+      "endTime": "2023-06-29T00:42:30.000Z",
+      "team1Name": "Cake",
+      "team2Name": "Ice Cream",
+      "team1Color": "#CE3189",
+      "team2Color": "#31CE76",
+      "team1Count": 5,
+      "team2Count": 8,
+      "team1Points": 0,
+      "team2Points": 0
+    },
+    {
+      "id": 2,
+      "startTime": "2023-06-29T00:43:00.000Z",
+      "endTime": "2023-06-30T01:40:30.000Z",
+      "team1Name": "Cock",
+      "team2Name": "Balls",
+      "team1Color": "#C12312",
+      "team2Color": "#C44311",
+      "team1Count": 20,
+      "team2Count": 14,
+      "team1Points": 0,
+      "team2Points": 0
+    }
+  ]
+}
