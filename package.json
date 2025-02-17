@@ -1,18 +1,16 @@
 {
   "name": "nsmb-mvl-starfestbackend",
-  "version": "1.0.0",
-  "description": "The backend for storing information about StarFests",
+  "version": "2.0.0",
+  "description": "The starfest revival is real",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "StarFest"
-  ],
-  "author": "Skillz",
+  "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2"
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "stack": "^0.1.0"
   }
 }

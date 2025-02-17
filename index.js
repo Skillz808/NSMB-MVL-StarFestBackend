@@ -1,106 +1,272 @@
 const express = require('express');
+const cors = require('cors');
+const fs = require('fs/promises');
+const path = require('path');
 const app = express();
 const port = 3000;
-const fs = require('fs');
-const path = require('path');
 
-const configFilePath = path.join(__dirname, 'config.json');
-const config = JSON.parse(fs.readFileSync(configFilePath, 'utf8'));
-
-const apiKeys = config.apiKey;
-
-const starfestsFile = './StarFestInfo.json';
-
+// Enable CORS for all routes
+app.use(cors());
 app.use(express.json());
 
-// Middleware to check the API key
-const requireApiKey = (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
+// Data storage paths
+const DATA_DIR = './data';
+const MATCHES_FILE = path.join(DATA_DIR, 'matches.json');
+const EVENT_STATS_FILE = path.join(DATA_DIR, 'event_stats.json');
+const EVENTS_CONFIG_FILE = path.join(DATA_DIR, 'events-config.json');
 
-  if (apiKey && apiKey === apiKeys) {
-    next();
-  } else {
-    res.status(401).send('Unauthorized');
-  }
-};
+// In-memory data
+let matches = [];
+let eventStats = {};
+let eventsConfig = null;
+let currentEvent = null;
 
-// Route to get the list of starfests
-app.get('/api/starfests', requireApiKey, async (req, res) => {
-  const starfests = await readStarfestsFromFile();
+// Initialize data storage
+async function initializeDataStorage() {
+    try {
+        await fs.mkdir(DATA_DIR, { recursive: true });
+        
+        // Load events configuration
+        try {
+            eventsConfig = JSON.parse(await fs.readFile(EVENTS_CONFIG_FILE, 'utf8'));
+            currentEvent = eventsConfig.events.find(event => event.active);
+            if (!currentEvent) {
+                console.warn('No active event found in configuration');
+            }
+        } catch (e) {
+            console.error('Error loading events configuration:', e);
+            process.exit(1); // Exit if we can't load event configuration
+        }
 
-  res.json(starfests);
-});
+        // Load matches
+        try {
+            matches = JSON.parse(await fs.readFile(MATCHES_FILE, 'utf8'));
+        } catch (e) {
+            matches = [];
+            await fs.writeFile(MATCHES_FILE, '[]');
+        }
 
-// Route to get the current date and time
-app.get('/api/currentDateTime', requireApiKey, (req, res) => {
-  const dateTime = new Date().toISOString();
-  res.send(dateTime);
-});
+        // Load event stats
+        try {
+            eventStats = JSON.parse(await fs.readFile(EVENT_STATS_FILE, 'utf8'));
+        } catch (e) {
+            eventStats = {};
+            await fs.writeFile(EVENT_STATS_FILE, '{}');
+        }
 
-// Route to increment the team1 count
-app.put('/starfests/increment-team1-count', requireApiKey, async (req, res) => {
-  const starfests = await readStarfestsFromFile();
+        // Initialize stats for current event if needed
+        if (currentEvent && !eventStats[currentEvent.id]) {
+            eventStats[currentEvent.id] = {
+                teams: {},
+                playerStats: {}
+            };
 
-  const currentStarfest = findCurrentStarfest(starfests);
+            // Initialize team stats
+            Object.entries(currentEvent.teams).forEach(([teamId, team]) => {
+                eventStats[currentEvent.id].teams[teamId] = {
+                    name: team.name,
+                    points: 0,
+                    totalStars: 0,
+                    matchesWon: 0
+                };
+            });
 
-  if (!currentStarfest) {
-    res.status(400).send('No ongoing starfest found');
-    return;
-  }
+            await saveData();
+        }
 
-  currentStarfest.team1Count++;
-
-  await writeStarfestsToFile(starfests);
-
-  res.status(200).send('Team 1 count incremented successfully');
-});
-
-// Route to increment the team2 count
-app.put('/starfests/increment-team2-count', requireApiKey, async (req, res) => {
-  const starfests = await readStarfestsFromFile();
-
-  const currentStarfest = findCurrentStarfest(starfests);
-
-  if (!currentStarfest) {
-    res.status(400).send('No ongoing starfest found');
-    return;
-  }
-
-  currentStarfest.team2Count++;
-
-  await writeStarfestsToFile(starfests);
-
-  res.status(200).send('Team 2 count incremented successfully');
-});
-
-// Helper function to read the starfests data from the file
-async function readStarfestsFromFile() {
-  const data = await fs.readFileSync(starfestsFile, 'utf8');
-  return JSON.parse(data);
-}
-
-// Helper function to find the current ongoing starfest
-function findCurrentStarfest(starfests) {
-  const now = new Date();
-
-  for (const starfest of starfests.starfests) {
-    const startTime = new Date(starfest.startTime);
-    const endTime = new Date(starfest.endTime);
-
-    if (now >= startTime && now <= endTime) {
-      return starfest;
+        console.log('Data storage initialized');
+    } catch (error) {
+        console.error('Error initializing data storage:', error);
     }
-  }
-
-  return null;
 }
 
-// Helper function to write the starfests data to the file
-async function writeStarfestsToFile(starfests) {
-  const data = JSON.stringify(starfests, null, 2);
-  await fs.writeFileSync(starfestsFile, data);
+// Save data to files
+async function saveData() {
+    try {
+        await fs.writeFile(MATCHES_FILE, JSON.stringify(matches, null, 2));
+        await fs.writeFile(EVENT_STATS_FILE, JSON.stringify(eventStats, null, 2));
+    } catch (error) {
+        console.error('Error saving data:', error);
+    }
 }
 
-app.listen(process.env.PORT || port, () => {
-  console.log(`API listening at http://localhost:${port}`);
+app.post('/match-results', async (req, res) => {
+    if (!currentEvent) {
+        return res.status(400).json({
+            status: 'error',
+            message: 'No active event'
+        });
+    }
+
+    try {
+        const matchData = req.body;
+        console.log('Received match results:', matchData);
+
+        // Store the complete match data
+        matches.push({
+            ...matchData,
+            eventId: currentEvent.id,
+            timestamp: new Date().toISOString()
+        });
+
+        const eventId = currentEvent.id;
+        const eventData = eventStats[eventId];
+
+        if (matchData.isTeamMode) {
+            // Update team statistics
+            matchData.teams.forEach(team => {
+                const teamId = team.teamId;
+                if (eventData.teams[teamId]) {
+                    eventData.teams[teamId].totalStars += team.score;
+                    if (team.rank === 1) {
+                        eventData.teams[teamId].matchesWon++;
+                        eventData.teams[teamId].points += 3;
+                    } else if (team.rank === 2) {
+                        eventData.teams[teamId].points += 2;
+                    } else if (team.rank === 3) {
+                        eventData.teams[teamId].points += 1;
+                    }
+                }
+            });
+        }
+
+        // Update player statistics
+        matchData.players.forEach(player => {
+            const playerId = player.playerId;
+            const teamId = player.team;
+            
+            if (!eventData.playerStats[playerId]) {
+                eventData.playerStats[playerId] = {
+                    nickname: player.nickname,
+                    teams: {}
+                };
+            }
+
+            if (!eventData.playerStats[playerId].teams[teamId]) {
+                eventData.playerStats[playerId].teams[teamId] = {
+                    matchesPlayed: 0,
+                    totalStars: 0,
+                    wins: 0,
+                    topThree: 0
+                };
+            }
+
+            const stats = eventData.playerStats[playerId].teams[teamId];
+            stats.matchesPlayed++;
+            stats.totalStars += player.stars;
+
+            if (matchData.isTeamMode) {
+                if (player.rank === 1) {
+                    stats.wins++;
+                    stats.topThree++;
+                } else if (player.rank <= 3) {
+                    stats.topThree++;
+                }
+            } else {
+                if (player.rank === 1) {
+                    stats.wins++;
+                    stats.topThree++;
+                } else if (player.rank <= 3) {
+                    stats.topThree++;
+                }
+            }
+
+            eventData.playerStats[playerId].nickname = player.nickname;
+        });
+
+        await saveData();
+
+        res.json({
+            status: 'success',
+            message: 'Match results recorded',
+            currentEvent: {
+                info: currentEvent,
+                stats: eventStats[eventId]
+            }
+        });
+    } catch (error) {
+        console.error('Error processing match results:', error);
+        res.status(500).json({
+            status: 'error',
+            message: error.message
+        });
+    }
+});
+
+// Get current event information and statistics
+app.get('/current-event', (req, res) => {
+    if (!currentEvent) {
+        return res.status(404).json({
+            status: 'error',
+            message: 'No active event'
+        });
+    }
+
+    res.json({
+        info: currentEvent,
+        stats: eventStats[currentEvent.id]
+    });
+});
+
+// Get specific player's current event statistics
+app.get('/current-event/player/:playerId', (req, res) => {
+    if (!currentEvent) {
+        return res.status(404).json({
+            status: 'error',
+            message: 'No active event'
+        });
+    }
+
+    const playerId = req.params.playerId;
+    const playerStats = eventStats[currentEvent.id].playerStats[playerId];
+    
+    if (playerStats) {
+        res.json(playerStats);
+    } else {
+        res.status(404).json({
+            status: 'error',
+            message: 'Player not found in current event'
+        });
+    }
+});
+
+// Get team statistics for current event
+app.get('/current-event/team/:teamId', (req, res) => {
+    if (!currentEvent) {
+        return res.status(404).json({
+            status: 'error',
+            message: 'No active event'
+        });
+    }
+
+    const teamId = req.params.teamId;
+    const teamStats = eventStats[currentEvent.id].teams[teamId];
+    
+    if (teamStats) {
+        // Get all players who have played for this team
+        const teamPlayers = Object.entries(eventStats[currentEvent.id].playerStats)
+            .filter(([_, playerData]) => playerData.teams[teamId])
+            .map(([playerId, playerData]) => ({
+                playerId,
+                nickname: playerData.nickname,
+                stats: playerData.teams[teamId]
+            }));
+
+        res.json({
+            teamStats,
+            players: teamPlayers
+        });
+    } else {
+        res.status(404).json({
+            status: 'error',
+            message: 'Team not found in current event'
+        });
+    }
+});
+
+// Initialize data storage and start server
+initializeDataStorage().then(() => {
+    app.listen(port, () => {
+        console.log(`Server listening at http://localhost:${port}`);
+    });
 });
